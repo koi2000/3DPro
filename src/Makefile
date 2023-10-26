@@ -1,6 +1,6 @@
 prefix=/usr/local
 
-CPPFLAGS	= -std=c++14 -g -O2 -Wno-unused-result
+CPPFLAGS	= -std=c++14 -g -O2 -Wno-unused-result -I /usr/local/include/eigen3
 NVCCFLAGS	= -std=c++14 -g -O2
 INCFLAGS	= -I ./ -I /usr/local/cgal/include
 LIBS		= -L/usr/local/cgal/lib -L/usr/lib/x86_64-linux-gnu/ -lgmp -lmpfr -lpthread -lgeos -lboost_program_options -lstdc++ -lspatialindex
@@ -82,7 +82,7 @@ STORAGE_OBJS := $(patsubst %.cpp,%.o,$(STORAGE_SRCS))
 JOIN_SRCS := $(wildcard join/*.cpp)
 JOIN_OBJS := $(patsubst %.cpp,%.o,$(JOIN_SRCS))
 
-all: compress decompress partition getoff join generator queryprocessor resque
+all: compress decompress partition getoff join generator 
 
 compress: test/compress.o $(SPATIAL_OBJS) $(STORAGE_OBJS) $(INDEX_OBJS) $(RC_OBJS) $(PPMC_OBJS) 
 	$(CXX) -DCGAL_USE_GMP -DCGAL_USE_MPFR -frounding-math $^ $(INCFLAGS) $(LIBS) $(CGALFLAGS) $(CPPFLAGS) -o ../build/$@

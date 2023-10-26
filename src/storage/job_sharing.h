@@ -8,8 +8,4 @@
 #ifndef JOB_SHARING_H_
 #define JOB_SHARING_H_
 
-
-
-
-
 #endif /* JOB_SHARING_H_ */

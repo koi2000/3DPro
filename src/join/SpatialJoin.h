@@ -8,129 +8,118 @@
 #ifndef SPATIALJOIN_H_
 #define SPATIALJOIN_H_
 
-#include "../storage/tile.h"
 #include "../geometry/geometry.h"
+#include "../storage/tile.h"
 #include <queue>
 
 using namespace std;
 
-namespace hispeed{
+namespace hispeed {
 
+class query_context {
+  public:
+    // time
+    double index_time = 0;
+    double decode_time = 0;
+    double packing_time = 0;
+    double computation_time = 0;
+    double updatelist_time = 0;
+    double overall_time = 0;
 
-class query_context{
-public:
+    // parameters
+    std::string query_type = "intersect";
+    double max_dist = 1000;
+    int num_thread = 0;
+    int num_compute_thread = 1;
+    int repeated_times = 1;
+    bool use_aabb = false;
+    bool use_gpu = false;
+    bool use_multimbb = false;
+    vector<int> lods;
 
-	//time
-	double index_time = 0;
-	double decode_time = 0;
-	double packing_time = 0;
-	double computation_time = 0;
-	double updatelist_time = 0;
-	double overall_time = 0;
+    // result
+    float max_nearest_distance = 0.0;
 
-	//parameters
-	std::string query_type = "intersect";
-	double max_dist = 1000;
-	int num_thread = 0;
-	int num_compute_thread = 1;
-	int repeated_times = 1;
-	bool use_aabb = false;
-	bool use_gpu = false;
-	bool use_multimbb = false;
-	vector<int> lods;
+    int highest_lod() {
+        if (lods.size() == 0) {
+            return 0;
+        }
+        else {
+            return lods[lods.size() - 1];
+        }
+    }
 
-	//result
-	float max_nearest_distance = 0.0;
+    query_context() {
+        num_compute_thread = 1;  // hispeed::get_num_threads();
+        num_thread = hispeed::get_num_threads();
+    }
 
-	int highest_lod(){
-		if(lods.size()==0){
-			return 0;
-		}else {
-			return lods[lods.size()-1];
-		}
-	}
+    void merge(query_context ctx) {
+        index_time += ctx.index_time;
+        decode_time += ctx.decode_time;
+        packing_time += ctx.packing_time;
+        computation_time += ctx.computation_time;
+        updatelist_time += ctx.updatelist_time;
+        overall_time += ctx.overall_time;
+        max_nearest_distance = std::max(max_nearest_distance, ctx.max_nearest_distance);
+    }
 
-	query_context(){
-		num_compute_thread = 1;//hispeed::get_num_threads();
-		num_thread = hispeed::get_num_threads();
-	}
+    void report(double t) {
+        cout << "total:\t" << t << endl;
+        cout << "index:\t" << t * index_time / overall_time << endl;
+        cout << "decode:\t" << t * decode_time / overall_time << endl;
+        cout << "packing:\t" << t * packing_time / overall_time << endl;
+        cout << "computation:\t" << t * computation_time / overall_time << endl;
+        cout << "updatelist:\t" << t * updatelist_time / overall_time << endl;
+        cout << "other:\t" << t * (overall_time - decode_time - computation_time - index_time) / overall_time << endl;
+        if (this->max_nearest_distance > 0) {
+            cout << "max min distance:\t" << this->max_nearest_distance << endl;
+        }
+        printf("analysis\t%f\t%f\t%f\n", (t * index_time / overall_time) / repeated_times,
+               (t * decode_time / overall_time) / repeated_times,
+               (t * (computation_time + packing_time + updatelist_time) / overall_time) / repeated_times);
 
-	void merge(query_context ctx){
-		index_time += ctx.index_time;
-		decode_time += ctx.decode_time;
-		packing_time += ctx.packing_time;
-		computation_time += ctx.computation_time;
-		updatelist_time += ctx.updatelist_time;
-		overall_time += ctx.overall_time;
-		max_nearest_distance = std::max(max_nearest_distance, ctx.max_nearest_distance);
-	}
-
-	void report(double t){
-
-		cout<<"total:\t"<<t<<endl;
-		cout<<"index:\t"<<t*index_time/overall_time<<endl;
-		cout<<"decode:\t"<<t*decode_time/overall_time<<endl;
-		cout<<"packing:\t"<<t*packing_time/overall_time<<endl;
-		cout<<"computation:\t"<<t*computation_time/overall_time<<endl;
-		cout<<"updatelist:\t"<<t*updatelist_time/overall_time<<endl;
-		cout<<"other:\t"<<t*(overall_time-decode_time-computation_time-index_time)/overall_time<<endl;
-		if(this->max_nearest_distance>0){
-			cout<<"max min distance:\t"<<this->max_nearest_distance<<endl;
-		}
-		printf("analysis\t%f\t%f\t%f\n",
-				(t*index_time/overall_time)/repeated_times,
-				(t*decode_time/overall_time)/repeated_times,
-				(t*(computation_time+packing_time+updatelist_time)/overall_time)/repeated_times);
-
-		cout<<"decode:\t"<<decode_time<<endl;
-		cout<<"packing:\t"<<packing_time<<endl;
-	}
-
+        cout << "decode:\t" << decode_time << endl;
+        cout << "packing:\t" << packing_time << endl;
+    }
 };
 
-
-class voxel_pair{
-public:
-	Voxel *v1;
-	Voxel *v2;
-	range dist;
-	bool intersect = false;
-	voxel_pair(Voxel *v1, Voxel *v2, range dist){
-		this->v1 = v1;
-		this->v2 = v2;
-		this->dist = dist;
-	};
-	voxel_pair(Voxel *v1, Voxel *v2){
-		this->v1 = v1;
-		this->v2 = v2;
-	}
+class voxel_pair {
+  public:
+    Voxel* v1;
+    Voxel* v2;
+    range dist;
+    bool intersect = false;
+    voxel_pair(Voxel* v1, Voxel* v2, range dist) {
+        this->v1 = v1;
+        this->v2 = v2;
+        this->dist = dist;
+    };
+    voxel_pair(Voxel* v1, Voxel* v2) {
+        this->v1 = v1;
+        this->v2 = v2;
+    }
 };
 
-typedef struct candidate_info_{
-	HiMesh_Wrapper *mesh_wrapper;
-	range distance;
-	vector<voxel_pair> voxel_pairs;
-}candidate_info;
+typedef struct candidate_info_
+{
+    HiMesh_Wrapper* mesh_wrapper;
+    range distance;
+    vector<voxel_pair> voxel_pairs;
+} candidate_info;
 
-typedef std::pair<HiMesh_Wrapper *, vector<candidate_info>> candidate_entry;
+typedef std::pair<HiMesh_Wrapper*, vector<candidate_info>> candidate_entry;
 
 // type of the workers, GPU or CPU
 // each worker took a batch of jobs (X*Y) from the job queue
 // and conduct the join, the result is then stored to
 // the target result addresses
-enum Worker_Type{
-	WT_GPU,
-	WT_CPU
-};
+enum Worker_Type { WT_GPU, WT_CPU };
 
-enum Join_Type{
-	JT_intersect,
-	JT_distance,
-	JT_nearest
-};
+enum Join_Type { JT_intersect, JT_distance, JT_nearest };
 
 // size of the buffer is 1GB
-const static long VOXEL_BUFFER_SIZE = 1<<30;
+const static long VOXEL_BUFFER_SIZE = 1 << 30;
 
 /* todo: need be updated
  * all computations will be aligned into computation units
@@ -145,77 +134,71 @@ const static long VOXEL_BUFFER_SIZE = 1<<30;
  * to store the data of those computing units. the true computation
  * is done by the GPU or CPU, and results will be copied into the result_addr
  * Corresponding to the buffer space claimed.
-*/
+ */
 
-class SpatialJoin{
+class SpatialJoin {
+    geometry_computer* computer = NULL;
 
-	geometry_computer *computer = NULL;
+    query_context global_ctx;
+    pthread_mutex_t g_lock;
 
-	query_context global_ctx;
-	pthread_mutex_t g_lock;
+  public:
+    SpatialJoin(geometry_computer* c, query_context& ctx) {
+        assert(c);
+        global_ctx = ctx;
+        pthread_mutex_init(&g_lock, NULL);
+        computer = c;
+    }
+    ~SpatialJoin() {}
+    void report_time(double t) {
+        global_ctx.report(t);
+    }
+    /*
+     *
+     * the main entry function to conduct next round of computation
+     * each object in tile1 need to compare with all objects in tile2.
+     * to avoid unnecessary computation, we need to build index on tile2.
+     * The unit for building the index for tile2 is the ABB for all or part
+     * of the surface (mostly triangle) of a polyhedron.
+     *
+     * */
+    vector<candidate_entry> mbb_nn(Tile* tile1, Tile* tile2, query_context& ctx);
+    vector<candidate_entry> mbb_within(Tile* tile1, Tile* tile2, query_context& ctx);
+    float* calculate_distance(vector<candidate_entry>& candidates, query_context& ctx, const int lod);
+    void nearest_neighbor(Tile* tile1, Tile* tile2, query_context ctx);
+    void within(Tile* tile1, Tile* tile2, query_context ctx);
 
-public:
+    vector<candidate_entry> mbb_intersect(Tile* tile1, Tile* tile2);
+    void intersect(Tile* tile1, Tile* tile2, query_context ctx);
 
-	SpatialJoin(geometry_computer *c, query_context &ctx){
-		assert(c);
-		global_ctx = ctx;
-		pthread_mutex_init(&g_lock, NULL);
-		computer = c;
-	}
-	~SpatialJoin(){}
-	void report_time(double t){
-		global_ctx.report(t);
-	}
-	/*
-	 *
-	 * the main entry function to conduct next round of computation
-	 * each object in tile1 need to compare with all objects in tile2.
-	 * to avoid unnecessary computation, we need to build index on tile2.
-	 * The unit for building the index for tile2 is the ABB for all or part
-	 * of the surface (mostly triangle) of a polyhedron.
-	 *
-	 * */
-	vector<candidate_entry> mbb_nn(Tile *tile1, Tile *tile2, query_context &ctx);
-	vector<candidate_entry> mbb_within(Tile *tile1, Tile *tile2, query_context &ctx);
-	float *calculate_distance(vector<candidate_entry> &candidates, query_context &ctx, const int lod);
-	void nearest_neighbor(Tile *tile1, Tile *tile2, query_context ctx);
-	void within(Tile *tile1, Tile *tile2, query_context ctx);
+    void join(vector<pair<Tile*, Tile*>>& tile_pairs, query_context&);
 
-	vector<candidate_entry> mbb_intersect(Tile *tile1, Tile *tile2);
-	void intersect(Tile *tile1, Tile *tile2, query_context ctx);
+    /*
+     *
+     * go check the index
+     *
+     * */
+    void check_index();
 
-	void join(vector<pair<Tile *, Tile *>> &tile_pairs, query_context &);
+    // register job to gpu
+    // worker can register work to gpu
+    // if the GPU is idle and queue is not full
+    // otherwise do it locally with CPU
+    float* register_computation(char* data, int num_cu);
 
-	/*
-	 *
-	 * go check the index
-	 *
-	 * */
-	void check_index();
+    /*
+     * do the geometry computation in a batch with GPU
+     *
+     * */
+    void compute_gpu();
 
-	// register job to gpu
-	// worker can register work to gpu
-	// if the GPU is idle and queue is not full
-	// otherwise do it locally with CPU
-	float *register_computation(char *data, int num_cu);
-
-	/*
-	 * do the geometry computation in a batch with GPU
-	 *
-	 * */
-	void compute_gpu();
-
-	/*
-	 * do the geometry computation in a batch with CPU
-	 *
-	 * */
-	void compute_cpu();
-
-
+    /*
+     * do the geometry computation in a batch with CPU
+     *
+     * */
+    void compute_cpu();
 };
 
-
-}
-
+}  // namespace hispeed
 
 #endif /* SPATIALJOIN_H_ */

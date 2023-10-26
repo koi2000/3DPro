@@ -44,7 +44,8 @@ extern "C" {
 
 #include "port.h"
 
-typedef struct {
+typedef struct
+{
     int n,             /* number of symbols */
         left,          /* symbols to next rescale */
         nextleft,      /* symbols with other increment */
@@ -64,18 +65,15 @@ typedef struct {
 /* rescale  desired rescaling interval, should be < 1<<(lg_totf+1) */
 /* init  array of int's to be used for initialisation (NULL ok) */
 /* compress  set to 1 on compression, 0 on decompression */
-void initqsmodel( qsmodel *m, int n, int lg_totf, int rescale,
-   int *init, int compress );
+void initqsmodel(qsmodel* m, int n, int lg_totf, int rescale, int* init, int compress);
 
 /* reinitialisation of qsmodel                         */
 /* m   qsmodel to be initialized                       */
 /* init  array of int's to be used for initialisation (NULL ok) */
-void resetqsmodel( qsmodel *m, int *init);
-
+void resetqsmodel(qsmodel* m, int* init);
 
 /* deletion of qsmodel m                               */
-void deleteqsmodel( qsmodel *m );
-
+void deleteqsmodel(qsmodel* m);
 
 /* retrieval of estimated frequencies for a symbol     */
 /* m   qsmodel to be questioned                        */
@@ -83,19 +81,17 @@ void deleteqsmodel( qsmodel *m );
 /* sy_f frequency of that symbol                       */
 /* lt_f frequency of all smaller symbols together      */
 /* the total frequency is 1<<lg_totf                   */
-void qsgetfreq( qsmodel *m, int sym, int *sy_f, int *lt_f );
-
+void qsgetfreq(qsmodel* m, int sym, int* sy_f, int* lt_f);
 
 /* find out symbol for a given cumulative frequency    */
 /* m   qsmodel to be questioned                        */
 /* lt_f  cumulative frequency                          */
-int qsgetsym( qsmodel *m, int lt_f );
-
+int qsgetsym(qsmodel* m, int lt_f);
 
 /* update model                                        */
 /* m   qsmodel to be updated                           */
 /* sym  symbol that occurred (must be <n from init)    */
-void qsupdate( qsmodel *m, int sym );
+void qsupdate(qsmodel* m, int sym);
 
 #ifdef __cplusplus
 }

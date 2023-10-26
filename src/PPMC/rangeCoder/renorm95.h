@@ -43,62 +43,57 @@ part of each and every copy made of these files.
 
 char coderversion[] = "Range Coder 1.1 with \"DCC95 renormalisation, Moffat et al.\". Modified by MS";
 
-#define         Half            (Top_value>>1)
-#define         Quarter         (Half>>1)
+#define Half (Top_value >> 1)
+#define Quarter (Half >> 1)
 
-#define OUTPUT_BIT(rco,b)                \
-do {if (!(rco)->bytecount--)             \
-    {   outbyte((rco),(rco)->buffer);    \
-        (rco)->bytecount = 7;            \
-    }                                    \
-    (rco)->buffer = (rco)->buffer<<1 | b;\
-} while (0)
+#define OUTPUT_BIT(rco, b)                                                                                             \
+    do {                                                                                                               \
+        if (!(rco)->bytecount--) {                                                                                     \
+            outbyte((rco), (rco)->buffer);                                                                             \
+            (rco)->bytecount = 7;                                                                                      \
+        }                                                                                                              \
+        (rco)->buffer = (rco)->buffer << 1 | b;                                                                        \
+    } while (0)
 
-
-#define INPUT_BIT(rco,target)            \
-do {if (!(rco)->bytecount)               \
-    {   (rco)->buffer = inbyte(rco);     \
-        (rco)->bytecount = 8;            \
-    }                                    \
-    (rco)->bytecount--;                  \
-    (target) = (target)<<1 | (((rco)->buffer>>(rco)->bytecount)&1);\
-} while (0)
-
+#define INPUT_BIT(rco, target)                                                                                         \
+    do {                                                                                                               \
+        if (!(rco)->bytecount) {                                                                                       \
+            (rco)->buffer = inbyte(rco);                                                                               \
+            (rco)->bytecount = 8;                                                                                      \
+        }                                                                                                              \
+        (rco)->bytecount--;                                                                                            \
+        (target) = (target) << 1 | (((rco)->buffer >> (rco)->bytecount) & 1);                                          \
+    } while (0)
 
 /*
  * BIT_PLUS_FOLLOW(b)
  * responsible for outputting the bit passed to it and an opposite number of
  * bit equal to the value stored in help (bits_outstanding)
  */
-#define BIT_PLUS_FOLLOW(rco,b)           \
-do {OUTPUT_BIT((rco),(b));               \
-    while ((rco)->help > 0)              \
-    {                                    \
-        OUTPUT_BIT((rco),!(b));          \
-        (rco)->help--;                   \
-    }                                    \
-} while (0)
-
+#define BIT_PLUS_FOLLOW(rco, b)                                                                                        \
+    do {                                                                                                               \
+        OUTPUT_BIT((rco), (b));                                                                                        \
+        while ((rco)->help > 0) {                                                                                      \
+            OUTPUT_BIT((rco), !(b));                                                                                   \
+            (rco)->help--;                                                                                             \
+        }                                                                                                              \
+    } while (0)
 
 /*
  * ENCODE_RENORMALISE
  * output code bits until the range has been expanded
  * to above QUARTER
  */
-static Inline void enc_normalize( rangecoder *rc )
-{   while (rc->range <= Quarter)
-    {
-        if (rc->low >= Half)
-        {
-            BIT_PLUS_FOLLOW(rc,1);
+static Inline void enc_normalize(rangecoder* rc) {
+    while (rc->range <= Quarter) {
+        if (rc->low >= Half) {
+            BIT_PLUS_FOLLOW(rc, 1);
             rc->low -= Half;
         }
-        else if (rc->low+rc->range <= Half)
-        {
-            BIT_PLUS_FOLLOW(rc,0);
+        else if (rc->low + rc->range <= Half) {
+            BIT_PLUS_FOLLOW(rc, 0);
         }
-        else
-        {
+        else {
             rc->help++;
             rc->low -= Quarter;
         }
@@ -107,28 +102,26 @@ static Inline void enc_normalize( rangecoder *rc )
     }
 }
 
-
-uint4 done_encoding( rangecoder *rc )
-{   int i,b;
-    rc->low += rc->range>>1;
-    enc_normalize( rc );
-    for (i = CODE_BITS-1; i>0; i--)
-    {   b = (rc->low>>i)&1;
-        BIT_PLUS_FOLLOW(rc,b);
+uint4 done_encoding(rangecoder* rc) {
+    int i, b;
+    rc->low += rc->range >> 1;
+    enc_normalize(rc);
+    for (i = CODE_BITS - 1; i > 0; i--) {
+        b = (rc->low >> i) & 1;
+        BIT_PLUS_FOLLOW(rc, b);
     }
     b = rc->low & 1;
-    BIT_PLUS_FOLLOW(rc,b);
-    outbyte(rc,rc->buffer<<rc->bytecount);
+    BIT_PLUS_FOLLOW(rc, b);
+    outbyte(rc, rc->buffer << rc->bytecount);
     return rc->bytecount;
 }
-
 
 /* Start the decoder                                         */
 /* rc is the range coder to be used                          */
 /* returns the char from start_encoding or EOF               */
-int start_decoding( rangecoder *rc )
-{   int c = inbyte(rc);
-    if (c==EOF)
+int start_decoding(rangecoder* rc) {
+    int c = inbyte(rc);
+    if (c == EOF)
         return EOF;
     rc->bytecount = 0;
     rc->low = 0;
@@ -141,10 +134,9 @@ int start_decoding( rangecoder *rc )
  * input code bits until range has been expanded to
  * more than QUARTER. Mimics encoder.
  */
-static Inline void dec_normalize( rangecoder *rc )
-{   while (rc->range <= Quarter)
-    {
+static Inline void dec_normalize(rangecoder* rc) {
+    while (rc->range <= Quarter) {
         rc->range <<= 1;
-        INPUT_BIT(rc,rc->low);
+        INPUT_BIT(rc, rc->low);
     }
 }
